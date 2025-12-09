@@ -4,8 +4,7 @@
 #include <bzlib.h>
 #include <omp.h>
 #include <sys/stat.h>
-
-#define BLOCK_SIZE (900 * 1024)
+#include <unistd.h>
 
 typedef struct {
     unsigned char *data;
@@ -21,13 +20,35 @@ int write_bzip2_file(const char *output_filename, CompressedBlock *blocks,
 void cleanup_blocks(CompressedBlock *blocks, int num_blocks);
 
 int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s <input_file> <output_file>\n", argv[0]);
+    int block_size_kb = 900;  
+    
+    int opt;
+    while ((opt = getopt(argc, argv, "b:")) != -1) {
+        switch (opt) {
+            case 'b':
+                block_size_kb = atoi(optarg);
+                if (block_size_kb <= 0) {
+                    fprintf(stderr, "Invalid block size\n");
+                    return 1;
+                }
+                break;
+            default:
+                fprintf(stderr, "Usage: %s [-b block_size_kb] <input_file> <output_file>\n", argv[0]);
+                return 1;
+        }
+    }
+    
+    int arg_offset = optind;
+    
+    if (argc - arg_offset != 2) {
+        fprintf(stderr, "Usage: %s [-b block_size_kb] <input_file> <output_file>\n", argv[0]);
         return 1;
     }
 
-    const char *input_filename = argv[1];
-    const char *output_filename = argv[2];
+    const char *input_filename = argv[arg_offset];
+    const char *output_filename = argv[arg_offset + 1];
+    
+    int BLOCK_SIZE = block_size_kb * 1024;  
     
     FILE *input_file = fopen(input_filename, "rb");
     if (!input_file) {
@@ -56,7 +77,14 @@ int main(int argc, char *argv[]) {
         fclose(input_file);
         return 1;
     }
-    fread(file_data, 1, file_size, input_file);
+    size_t bytes_read = fread(file_data, 1, file_size, input_file);
+    if (bytes_read != file_size) {
+        fprintf(stderr, "Error reading file\n");
+        free(file_data);
+        free(compressed_blocks);
+        fclose(input_file);
+        return 1;
+    }
     fclose(input_file);
 
     double start_time = omp_get_wtime();
