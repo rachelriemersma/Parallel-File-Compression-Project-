@@ -26,16 +26,16 @@ BLOCK_SIZE_KB=900
 NUM_THREADS=16
 EXPECTED_MEM=$(((BLOCK_SIZE_KB * NUM_THREADS) / 1024))
 echo "Expected memory usage: ~${EXPECTED_MEM} MB"
-/usr/bin/time -v ./parallel_bzip2_memopt -b 900 large_test.txt output_memopt.bz2 2>&1 | grep -E "(Maximum resident|Compression time|Throughput)"
+/usr/bin/time -v ./parallel_bzip2_mem -b 900 large_test.txt output_memopt.bz2 2>&1 | grep -E "(Maximum resident|Compression time|Throughput)"
 echo ""
 
 # Verify outputs are identical
 echo "Verifying both outputs are identical..."
 diff output_original.bz2 output_memopt.bz2
 if [ $? -eq 0 ]; then
-    echo "Outputs match - optimization is correct!"
+    echo "✓ Outputs match - optimization is correct!"
 else
-    echo "Outputs differ - something is wrong!"
+    echo "✗ Outputs differ - something is wrong!"
 fi
 
 # Cleanup

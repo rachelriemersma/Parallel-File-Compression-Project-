@@ -6,19 +6,19 @@ TARGET = parallel_bzip2
 SOURCES = parallel_bzip2.c
 OBJECTS = $(SOURCES:.c=.o)
 
-all: $(TARGET) parallel_bzip2_memopt
+all: $(TARGET) parallel_bzip2_mem
 
 $(TARGET): $(OBJECTS)
 	$(CC) $(OBJECTS) -o $(TARGET) $(LDFLAGS)
 
-parallel_bzip2_memopt: parallel_bzip2_memopt.c
-	$(CC) $(CFLAGS) parallel_bzip2_memopt.c -o parallel_bzip2_memopt $(LDFLAGS)
+parallel_bzip2_mem: parallel_bzip2_mem.c
+	$(CC) $(CFLAGS) parallel_bzip2_mem.c -o parallel_bzip2_mem $(LDFLAGS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(OBJECTS) $(TARGET) parallel_bzip2_memopt
+	rm -f $(OBJECTS) $(TARGET) parallel_bzip2_mem
 
 test: $(TARGET)
 	./$(TARGET) test_input.txt test_output.bz2
