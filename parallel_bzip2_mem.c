@@ -1,4 +1,3 @@
-// parallel_bzip2_memopt.c - Memory optimized version
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -57,6 +56,7 @@ int main(int argc, char *argv[]) {
     printf("File size: %ld bytes\n", file_size);
     printf("Number of blocks: %d\n", num_blocks);
     printf("Block size: %d bytes\n", BLOCK_SIZE);
+    // expected memory usage 
     printf("Memory usage (optimized): ~%d MB (vs %ld MB unoptimized)\n", 
            (BLOCK_SIZE * omp_get_max_threads()) / (1024 * 1024),
            file_size / (1024 * 1024));
@@ -70,26 +70,22 @@ int main(int argc, char *argv[]) {
     double start_time = omp_get_wtime();
     int compression_errors = 0;
     
-    // MEMORY OPTIMIZED: Each thread reads its own block from disk
     #pragma omp parallel for schedule(dynamic)
     for (int i = 0; i < num_blocks; i++) {
-        // Calculate block boundaries
         unsigned int offset = (long)i * BLOCK_SIZE;
         unsigned int block_size = BLOCK_SIZE;
         
         if (offset + block_size > file_size) {
             block_size = file_size - offset;
         }
-
-        // Each thread opens file and reads only its block
+        // each thread reads its own block
         FILE *fp = fopen(input_filename, "rb");
         if (!fp) {
             #pragma omp atomic
             compression_errors++;
             continue;
         }
-
-        // Allocate memory for ONLY this block (not entire file!)
+        // allocate small buffer for this block only 
         unsigned char *block_data = malloc(block_size);
         if (!block_data) {
             fclose(fp);
@@ -97,9 +93,9 @@ int main(int argc, char *argv[]) {
             compression_errors++;
             continue;
         }
-
-        // Seek to block position and read
+        // feek to this blocks position in the file 
         fseek(fp, offset, SEEK_SET);
+        // read only this block from disk 
         size_t bytes_read = fread(block_data, 1, block_size, fp);
         fclose(fp);
 
@@ -109,27 +105,15 @@ int main(int argc, char *argv[]) {
             compression_errors++;
             continue;
         }
-
-        // Compress this block
+        // compress from threads small buffer 
         int result = compress_block(block_data, block_size, 
                                    &compressed_blocks[i]);
-        
-        // Free block data immediately (not needed anymore!)
+        // free immediately after compression 
         free(block_data);
         
         if (result != 0) {
             #pragma omp atomic
             compression_errors++;
-        }
-        
-        #pragma omp critical
-        {
-            static int completed = 0;
-            completed++;
-            if (completed % 10 == 0 || completed == num_blocks) {
-                printf("\rCompressed %d/%d blocks", completed, num_blocks);
-                fflush(stdout);
-            }
         }
     }
     printf("\n");
@@ -143,7 +127,6 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    printf("Writing compressed file...\n");
     if (write_bzip2_file(output_filename, compressed_blocks, num_blocks) != 0) {
         fprintf(stderr, "Failed to write output file\n");
         cleanup_blocks(compressed_blocks, num_blocks);
